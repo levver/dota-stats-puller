@@ -442,7 +442,10 @@
                         name: heroInfo ? heroInfo.name : `Unknown Hero (ID: ${heroStat.hero_id})`,
                         iconUrl: heroInfo ? heroInfo.iconUrl : defaultIcon,
                         games: parseInt(heroStat.games, 10),
-                        winrate: (parseInt(heroStat.win, 10) > 0) ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(1) + '%' : 'N/A',
+                        // FIX: Changed to toFixed(0) for integer rounding and updated 0 win case to '0%'
+                        winrate: (parseInt(heroStat.win, 10) > 0) 
+                            ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(0) + '%' 
+                            : '0%',
                     };
                 });
 
@@ -475,7 +478,8 @@
                     </div>
                     <div class="text-right flex items-center flex-shrink-0 ml-2">
                         <span class="text-xs mr-1 font-mono bg-gray-700 px-1.5 py-0.5 rounded">${hero.games} games</span>
-                        <span class="text-xs font-mono px-1.5 py-0.5 rounded ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === 'N/A' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate} WR</span>
+                        <!-- Added w-14, text-center, and flex-shrink-0 to fix the size of the WR element -->
+                        <span class="text-xs font-mono px-1.5 py-0.5 rounded w-14 text-center flex-shrink-0 ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === '0%' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate}</span>
                     </div>
                 </li>
             `).join('');
@@ -524,7 +528,7 @@
                     <h3 class="flex items-center text-2xl font-bold text-red-400 truncate">
                         <img src="${result.avatarUrl}" alt="${result.name} Profile Picture" class="w-10 h-10 rounded-full mr-3 object-cover border-2 border-red-500" onerror="this.onerror=null;this.src='https://placehold.co/40x40/374151/FFFFFF?text=P'">
                         <span>${result.name}</span>
-                        <!-- Rank icon size changed to w-12 h-12 (48x48) -->
+                        <!-- Rank icon size is w-12 h-12 (48x48) -->
                         <img src="${result.rankUrl.url}" alt="${result.rankUrl.text}" title="${result.rankText}" class="w-12 h-12 ml-3 flex-shrink-0" onerror="this.onerror=null;this.src='${rankFallbackPlaceholder}'">
                     </h3>
                     <p class="text-sm text-gray-400 -mt-2">
