@@ -33,12 +33,7 @@
         .dota-button:active {
             transform: scale(0.98);
         }
-        /* Custom styles for hero stats list */
-        .hero-stat-list {
-            /* Removed min-height: 300px to allow list to shrink when fewer than 10 heroes are present */
-            max-height: 300px;
-            overflow-y: auto;
-        }
+        /* The custom styles for .hero-stat-list were removed to allow the list to fit all 10 results without scrolling. */
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen">
@@ -91,7 +86,7 @@
     </div>
 
     <script type="text/javascript">
-        // Global map to store Hero ID to Hero Name mapping
+        // Global map to store Hero ID to Hero Name and Icon URL mapping
         let heroMap = {};
         // New global variable to store the data displayed in the cards for copying
         let processedResults = []; 
@@ -99,6 +94,12 @@
         const MAX_PROFILES = 5;
         const TOP_HEROES_COUNT = 10;
         const OPENDOTA_BASE_URL = 'https://api.opendota.com/api';
+        
+        // Asset URLs - Updated per user request
+        const HERO_ASSET_BASE_URL = 'https://cdn.steamstatic.com/apps/dota2/images/dota_react/heroes/';
+        // Base path for OpenDota rank assets
+        const RANK_ASSET_BASE_URL = 'https://www.opendota.com/assets/images/dota2/rank_icons/';
+
         // Lobby Type 1 corresponds to tournament games
         const LOBBY_TYPE_PRO = 1; 
         const POSITIONS = ["Carry", "Mid", "Offlane", "Soft Supp", "Hard Supp"];
@@ -279,11 +280,65 @@
             }
         }
 
+        /**
+         * Generates the URL for the rank medal icon based on the rank_tier value, using the simplified rank_icon_X.png format.
+         * The rank text remains detailed (e.g., Archon 4).
+         * @param {number} rankTier - The two-digit rank tier (e.g., 55 for Legend 5).
+         * @returns {object} An object containing the URL and the descriptive rank text.
+         */
+        function getRankIconUrl(rankTier) {
+            
+            const tierMap = { 
+                0: 'Uncalibrated/Private', 
+                1: 'Herald', 
+                2: 'Guardian', 
+                3: 'Crusader', 
+                4: 'Archon', 
+                5: 'Legend', 
+                6: 'Ancient', 
+                7: 'Divine', 
+                8: 'Immortal' 
+            };
+
+            // Extract tier (first digit) and star (second digit)
+            const tier = Math.floor(rankTier / 10); 
+            const star = rankTier % 10; 
+
+            // Base uncalibrated/private files
+            const UNCALIBRATED_ICON_URL = `${RANK_ASSET_BASE_URL}rank_icon_0.png`; 
+            const UNCALIBRATED_TEXT = tierMap[0];
+            
+            let filename;
+            let rankText = tierMap[tier] || 'Ranked';
+            
+            // Check if rank is invalid, missing, or uncalibrated (0-9)
+            if (!rankTier || typeof rankTier !== 'number' || tier < 1) {
+                return { url: UNCALIBRATED_ICON_URL, text: UNCALIBRATED_TEXT };
+            }
+
+            // Use the simplified filename format requested: rank_icon_X.png
+            if (tier >= 1 && tier <= 8) {
+                filename = `rank_icon_${tier}.png`;
+                
+                // Keep rank text accurate by including star if applicable (1-7)
+                if (tier >= 1 && tier <= 7 && star >= 1 && star <= 5) {
+                    rankText += ` ${star}`;
+                }
+            } else {
+                 // Fallback if tier is outside the expected range
+                 return { url: UNCALIBRATED_ICON_URL, text: UNCALIBRATED_TEXT };
+            }
+            
+            // Construct the final URL using the requested OpenDota base path
+            const finalUrl = `${RANK_ASSET_BASE_URL}${filename}`;
+            
+            return { url: finalUrl, text: rankText };
+        }
 
         // --- Core Application Logic ---
 
         /**
-         * Fetches the hero list from OpenDota and creates a map (ID -> Name).
+         * Fetches the hero list from OpenDota and creates a map (ID -> {Name, IconUrl}).
          * @returns {Promise<boolean>} True if successful, false otherwise.
          */
         async function fetchHeroMap() {
@@ -295,8 +350,22 @@
                 const data = await response.json();
 
                 data.forEach(hero => {
-                    // key is hero ID (number), value is localized name
-                    heroMap[hero.id] = hero.localized_name;
+                    // Hero icon placeholder size (32x32)
+                    let iconUrl = 'https://placehold.co/32x32/374151/FFFFFF?text=?'; 
+                    
+                    if (hero.name) {
+                        // hero.name is like 'npc_dota_hero_axe', we extract 'axe'
+                        const safeName = hero.name.replace('npc_dota_hero_', ''); 
+                        // Using the Steam CDN path for hero icons
+                        iconUrl = `${HERO_ASSET_BASE_URL}${safeName}.png`;
+                    } else {
+                        console.warn(`Missing name for Hero ID: ${hero.id} (${hero.localized_name})`);
+                    }
+                    
+                    heroMap[hero.id] = {
+                        name: hero.localized_name,
+                        iconUrl: iconUrl
+                    };
                 });
                 displayMessage('Hero database loaded successfully. Enter profile IDs or Dotabuff URLs to begin.', 'success');
                 document.getElementById('button-text').textContent = 'Get Most Played Heroes';
@@ -364,11 +433,18 @@
                 }
 
                 // 3. Get top N heroes from the filtered list. Slice correctly handles arrays shorter than TOP_HEROES_COUNT.
-                const topHeroes = playedHeroes.slice(0, TOP_HEROES_COUNT).map(heroStat => ({
-                    name: heroMap[heroStat.hero_id] || `Unknown Hero (ID: ${heroStat.hero_id})`,
-                    games: parseInt(heroStat.games, 10),
-                    winrate: (parseInt(heroStat.games, 10) > 0) ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(1) + '%' : 'N/A',
-                }));
+                const topHeroes = playedHeroes.slice(0, TOP_HEROES_COUNT).map(heroStat => {
+                    const heroInfo = heroMap[heroStat.hero_id];
+                    // Hero icon placeholder size (32x32)
+                    const defaultIcon = 'https://placehold.co/32x32/374151/FFFFFF?text=?'; 
+
+                    return {
+                        name: heroInfo ? heroInfo.name : `Unknown Hero (ID: ${heroStat.hero_id})`,
+                        iconUrl: heroInfo ? heroInfo.iconUrl : defaultIcon,
+                        games: parseInt(heroStat.games, 10),
+                        winrate: (parseInt(heroStat.win, 10) > 0) ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(1) + '%' : 'N/A',
+                    };
+                });
 
                 return { success: true, heroes: topHeroes };
 
@@ -390,8 +466,13 @@
             }
             
             return heroes.map((hero, index) => `
-                <li class="flex justify-between items-center text-gray-300">
-                    <span class="font-medium text-white text-sm truncate">${index + 1}. ${hero.name}</span>
+                <li class="flex justify-between items-center text-gray-300 py-1">
+                    <div class="flex items-center">
+                        <span class="font-medium text-white text-sm mr-2">${index + 1}.</span>
+                        <!-- Icon size is w-8 h-8 (32x32) -->
+                        <img src="${hero.iconUrl}" alt="${hero.name} Icon" class="w-8 h-8 rounded-full mr-2 object-cover border border-gray-600" onerror="this.onerror=null;this.src='https://placehold.co/32x32/374151/FFFFFF?text=?'">
+                        <span class="font-medium text-white text-sm truncate">${hero.name}</span>
+                    </div>
                     <div class="text-right flex items-center flex-shrink-0 ml-2">
                         <span class="text-xs mr-1 font-mono bg-gray-700 px-1.5 py-0.5 rounded">${hero.games} games</span>
                         <span class="text-xs font-mono px-1.5 py-0.5 rounded ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === 'N/A' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate} WR</span>
@@ -417,14 +498,13 @@
                 let success = data.success && data.heroes.length > 0;
                 
                 if (success) {
-                    // Note: .hero-stat-list will now naturally shrink if less than 10 heroes are present
-                    content = `<ul class="space-y-2 hero-stat-list">${generateHeroListHTML(data.heroes)}</ul>`;
+                    // Removed .hero-stat-list class to allow the list to expand fully
+                    content = `<ul class="space-y-2">${generateHeroListHTML(data.heroes)}</ul>`;
                 } else {
                     const messageClass = (title === 'Professional Games') ? 'text-gray-400 text-sm' : 'text-red-300 text-sm';
-                    // Updated column title in case of error message
                     const displayTitle = title === 'Tournament Games' ? 'Tournament matches' : title; 
-                    // .hero-stat-list ensures the message block also respects the max height/scrolling if needed
-                    content = `<div class="p-4 text-center ${messageClass} bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${data.message.replace('Tournament matches', displayTitle)}</div>`;
+                    // Added h-full and min-h-[200px] to ensure visual stability when there is no data
+                    content = `<div class="p-4 text-center ${messageClass} bg-gray-800/50 rounded-lg flex items-center justify-center h-full min-h-[200px]">${data.message.replace('Tournament matches', displayTitle)}</div>`;
                 }
 
                 return `
@@ -436,12 +516,21 @@
             };
 
             // --- Card Assembly ---
+            // Fallback placeholder image for rank icon failure. Updated to 48x48.
+            const rankFallbackPlaceholder = 'https://placehold.co/48x48/374151/FFFFFF?text=R';
+
             cardHTML = `
                 <div class="dota-card ${overallSuccess ? 'bg-gray-700' : 'bg-gray-700/50 border border-red-500/50'} p-6 rounded-xl space-y-4">
-                    <h3 class="text-2xl font-bold text-red-400 truncate">
-                        ${result.name}
+                    <h3 class="flex items-center text-2xl font-bold text-red-400 truncate">
+                        <img src="${result.avatarUrl}" alt="${result.name} Profile Picture" class="w-10 h-10 rounded-full mr-3 object-cover border-2 border-red-500" onerror="this.onerror=null;this.src='https://placehold.co/40x40/374151/FFFFFF?text=P'">
+                        <span>${result.name}</span>
+                        <!-- Rank icon size changed to w-12 h-12 (48x48) -->
+                        <img src="${result.rankUrl.url}" alt="${result.rankUrl.text}" title="${result.rankText}" class="w-12 h-12 ml-3 flex-shrink-0" onerror="this.onerror=null;this.src='${rankFallbackPlaceholder}'">
                     </h3>
-                    <p class="text-sm text-gray-400 -mt-2">Profile ID: ${result.accountId}</p>
+                    <p class="text-sm text-gray-400 -mt-2">
+                        Profile ID: ${result.accountId} 
+                        <span class="font-medium text-white ml-2">Rank: ${result.rankText}</span>
+                    </p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- All-Time Column -->
@@ -479,18 +568,39 @@
                         fetchHeroStats(id, null, null),   // All-Time
                         fetchHeroStats(id, 30, null),     // Last 30 Days
                         fetchHeroStats(id, 180, LOBBY_TYPE_PRO), // Tournament Games (180 days)
-                        fetch(`${OPENDOTA_BASE_URL}/players/${id}`) // Player name
+                        fetch(`${OPENDOTA_BASE_URL}/players/${id}`) // Player name/profile data
                     ]);
 
                     let playerName = `Player ${id}`;
+                    let avatarUrl = 'https://placehold.co/40x40/374151/FFFFFF?text=P'; // Default placeholder
+                    let rankUrl = getRankIconUrl(0); // Default to uncalibrated
+                    let rankText = 'Uncalibrated';
+                    
                     if (playerResponse.ok) {
                         const playerData = await playerResponse.json();
                         playerName = playerData.profile?.personaname || `Player ${id}`;
+                        avatarUrl = playerData.profile?.avatarfull || avatarUrl;
+                        
+                        const rankTier = playerData.rank_tier;
+                        const leaderboardRank = playerData.leaderboard_rank;
+
+                        if (rankTier) {
+                            const rankData = getRankIconUrl(rankTier);
+                            rankUrl = rankData;
+                            rankText = rankData.text;
+
+                            if (rankTier >= 80 && leaderboardRank) {
+                                rankText = `Immortal #${leaderboardRank}`;
+                            }
+                        }
                     }
-                    
+
                     return {
                         accountId: id,
                         name: playerName,
+                        avatarUrl: avatarUrl,
+                        rankUrl: rankUrl,
+                        rankText: rankText,
                         allTime: allTimeResult,
                         monthly: monthlyResult,
                         pro: proResult
@@ -499,21 +609,6 @@
 
                 const results = await Promise.all(fetchPromises);
                 processedResults = results; // Store results globally for copying
-
-                // 1. --- NEW LOGIC: Update URL with processed IDs ---
-                const newParams = new URLSearchParams();
-                uniqueProfileIds.forEach((id, index) => {
-                    // Use a 1-based index for id1, id2, etc.
-                    newParams.set(`id${index + 1}`, id); 
-                });
-
-                const baseUrl = window.location.pathname;
-                const newUrl = `${baseUrl}?${newParams.toString()}`;
-                
-                // Use replaceState to update the URL without adding a history entry
-                window.history.replaceState(null, '', newUrl);
-                // ----------------------------------------------------
-
 
                 // 2. Render Results
                 document.getElementById('results-title').classList.remove('hidden');
@@ -526,7 +621,7 @@
                     document.getElementById('copy-button').classList.remove('hidden');
                 }
 
-                displayMessage(`Successfully processed ${results.length} unique profiles. The URL has been updated for easy sharing.`, 'success');
+                displayMessage(`Successfully processed ${results.length} unique profiles.`, 'success');
 
             } catch (error) {
                 console.error("An unexpected error occurred during processing:", error);
