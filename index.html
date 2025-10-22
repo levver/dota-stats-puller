@@ -500,7 +500,22 @@
                 const results = await Promise.all(fetchPromises);
                 processedResults = results; // Store results globally for copying
 
-                // 4. Render Results
+                // 1. --- NEW LOGIC: Update URL with processed IDs ---
+                const newParams = new URLSearchParams();
+                uniqueProfileIds.forEach((id, index) => {
+                    // Use a 1-based index for id1, id2, etc.
+                    newParams.set(`id${index + 1}`, id); 
+                });
+
+                const baseUrl = window.location.pathname;
+                const newUrl = `${baseUrl}?${newParams.toString()}`;
+                
+                // Use replaceState to update the URL without adding a history entry
+                window.history.replaceState(null, '', newUrl);
+                // ----------------------------------------------------
+
+
+                // 2. Render Results
                 document.getElementById('results-title').classList.remove('hidden');
 
                 results.forEach(result => {
@@ -511,7 +526,7 @@
                     document.getElementById('copy-button').classList.remove('hidden');
                 }
 
-                displayMessage(`Successfully processed ${results.length} unique profiles.`, 'success');
+                displayMessage(`Successfully processed ${results.length} unique profiles. The URL has been updated for easy sharing.`, 'success');
 
             } catch (error) {
                 console.error("An unexpected error occurred during processing:", error);
