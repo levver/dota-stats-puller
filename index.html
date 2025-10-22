@@ -35,7 +35,7 @@
         }
         /* Custom styles for hero stats list */
         .hero-stat-list {
-            min-height: 300px; /* Reduced height to fit 3 columns */
+            /* Removed min-height: 300px to allow list to shrink when fewer than 10 heroes are present */
             max-height: 300px;
             overflow-y: auto;
         }
@@ -49,7 +49,7 @@
                 Dota 2 Hero Stats Checker
             </h1>
             <p class="text-lg text-gray-400">
-                Enter up to 5 OpenDota/Dotabuff Profile IDs to see their **All-Time**, **Last 30 Days**, and **Professional Matches** hero stats.
+                Enter up to 5 OpenDota/Dotabuff Profile IDs to see hero stats.
             </p>
         </header>
 
@@ -151,7 +151,7 @@
          * @returns {string|null} The extracted numerical account ID, or null if invalid.
          */
         function parseInputForAccountId(input) {
-            const trimmedInput = input.trim();
+            trimmedInput = input.trim();
             if (!trimmedInput) return null;
 
             // 1. Regex for Dotabuff URL: https://www.dotabuff.com/players/12345678
@@ -241,8 +241,11 @@
 
                 const data = await response.json();
 
-                // OpenDota returns an empty array if the profile is private/empty/no games played in period
-                if (!Array.isArray(data) || data.length === 0) {
+                // 1. Filter out heroes with 0 games played immediately, as requested.
+                const playedHeroes = data.filter(heroStat => parseInt(heroStat.games, 10) > 0);
+
+                // 2. Check if there is any data after filtering.
+                if (!Array.isArray(playedHeroes) || playedHeroes.length === 0) {
                      // Customize message for Pro Matches if lobbyType is set
                      const message = lobbyType === LOBBY_TYPE_PRO 
                          ? "No Tournament matches found." 
@@ -251,8 +254,8 @@
                      return { success: false, message: message };
                 }
 
-                // Get top N heroes
-                const topHeroes = data.slice(0, TOP_HEROES_COUNT).map(heroStat => ({
+                // 3. Get top N heroes from the filtered list. Slice correctly handles arrays shorter than TOP_HEROES_COUNT.
+                const topHeroes = playedHeroes.slice(0, TOP_HEROES_COUNT).map(heroStat => ({
                     name: heroMap[heroStat.hero_id] || `Unknown Hero (ID: ${heroStat.hero_id})`,
                     games: parseInt(heroStat.games, 10),
                     winrate: (parseInt(heroStat.games, 10) > 0) ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(1) + '%' : 'N/A',
@@ -305,11 +308,13 @@
                 let success = data.success && data.heroes.length > 0;
                 
                 if (success) {
+                    // Note: .hero-stat-list will now naturally shrink if less than 10 heroes are present
                     content = `<ul class="space-y-2 hero-stat-list">${generateHeroListHTML(data.heroes)}</ul>`;
                 } else {
                     const messageClass = (title === 'Professional Games') ? 'text-gray-400 text-sm' : 'text-red-300 text-sm';
                     // Updated column title in case of error message
                     const displayTitle = title === 'Tournament Games' ? 'Tournament matches' : title; 
+                    // .hero-stat-list ensures the message block also respects the max height/scrolling if needed
                     content = `<div class="p-4 text-center ${messageClass} bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${data.message.replace('Tournament matches', displayTitle)}</div>`;
                 }
 
@@ -379,7 +384,7 @@
                     const [allTimeResult, monthlyResult, proResult, playerResponse] = await Promise.all([
                         fetchHeroStats(id, null, null),   // All-Time
                         fetchHeroStats(id, 30, null),     // Last 30 Days
-                        fetchHeroStats(id, 180, LOBBY_TYPE_PRO), // Tournament Games
+                        fetchHeroStats(id, 180, LOBBY_TYPE_PRO), // Tournament Games (180 days)
                         fetch(`${OPENDOTA_BASE_URL}/players/${id}`) // Player name
                     ]);
 
