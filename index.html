@@ -6,7 +6,7 @@
     <title>Dota 2 Most Played Hero Checker</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght(0,400);0,600;0,700&display=swap" rel="stylesheet">
     <style>
         /* Custom scrollbar for a cleaner look */
         ::-webkit-scrollbar { width: 8px; }
@@ -35,19 +35,21 @@
         }
         /* Custom styles for hero stats list */
         .hero-stat-list {
-            min-height: 280px; /* Ensure visual stability when one list is short */
+            min-height: 300px; /* Reduced height to fit 3 columns */
+            max-height: 300px;
+            overflow-y: auto;
         }
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen">
 
-    <div class="max-w-4xl mx-auto">
+    <div class="max-w-6xl mx-auto"> <!-- Increased max width for 3 columns -->
         <header class="text-center mb-10">
             <h1 class="text-4xl font-extrabold text-white mb-2 tracking-tight">
                 Dota 2 Hero Stats Checker
             </h1>
             <p class="text-lg text-gray-400">
-                Enter up to 5 OpenDota/Dotabuff Profile IDs to see their **All-Time** and **Last 30 Days** hero stats.
+                Enter up to 5 OpenDota/Dotabuff Profile IDs to see their **All-Time**, **Last 30 Days**, and **Professional Matches** hero stats.
             </p>
         </header>
 
@@ -73,7 +75,7 @@
         <!-- Results Area -->
         <div id="results-container" class="space-y-6">
             <h2 id="results-title" class="text-2xl font-bold text-white hidden">Results</h2>
-            <div id="results-list" class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div id="results-list" class="grid grid-cols-1 lg:grid-cols-1 gap-6">
                 <!-- Player cards will be injected here -->
             </div>
         </div>
@@ -88,6 +90,9 @@
         const MAX_PROFILES = 5;
         const TOP_HEROES_COUNT = 10;
         const OPENDOTA_BASE_URL = 'https://api.opendota.com/api';
+        // Lobby Type 1 corresponds to tournament games
+        const LOBBY_TYPE_PRO = 1; 
+        const POSITIONS = ["Carry", "Mid", "Offlane", "Soft Supp", "Hard Supp"];
 
         // --- Utility Functions ---
 
@@ -139,6 +144,35 @@
                 spinner.classList.add('hidden');
             }
         }
+        
+        /**
+         * Parses an input string (either raw ID or Dotabuff URL) and returns the clean numerical ID.
+         * @param {string} input - The raw input from a text field.
+         * @returns {string|null} The extracted numerical account ID, or null if invalid.
+         */
+        function parseInputForAccountId(input) {
+            const trimmedInput = input.trim();
+            if (!trimmedInput) return null;
+
+            // 1. Regex for Dotabuff URL: https://www.dotabuff.com/players/12345678
+            // Allows optional 'www.' and is non-greedy
+            const dotabuffRegex = /dotabuff\.com\/players\/(\d+)/i;
+            const match = trimmedInput.match(dotabuffRegex);
+
+            if (match && match[1]) {
+                // Return the captured group (the ID)
+                return match[1];
+            } 
+            
+            // 2. Check if it's just a number (which is what OpenDota expects)
+            // Checks for 1 or more digits
+            if (/^\d+$/.test(trimmedInput)) {
+                return trimmedInput;
+            }
+
+            // Invalid format
+            return null; 
+        }
 
         // --- Core Application Logic ---
 
@@ -157,7 +191,7 @@
                     // key is hero ID (number), value is localized name
                     heroMap[hero.id] = hero.localized_name;
                 });
-                displayMessage('Hero database loaded successfully. Enter profile IDs to begin.', 'success');
+                displayMessage('Hero database loaded successfully. Enter profile IDs or Dotabuff URLs to begin.', 'success');
                 document.getElementById('button-text').textContent = 'Get Most Played Heroes';
             } catch (error) {
                 console.error("Failed to fetch hero map:", error);
@@ -173,15 +207,25 @@
         }
 
         /**
-         * Fetches the top heroes for a given profile ID for a specified time frame.
+         * Fetches the top heroes for a given profile ID for a specified time frame or lobby type.
          * @param {string} accountId - The Dota 2 profile ID.
          * @param {number|null} days - Number of days to filter (e.g., 30), or null for all-time.
+         * @param {number|null} lobbyType - Lobby type ID (e.g., 2 for Ranked), or null for all types.
          * @returns {Promise<Object>} Object containing success status, message, and hero data.
          */
-        async function fetchHeroStats(accountId, days) {
+        async function fetchHeroStats(accountId, days, lobbyType) {
             let url = `${OPENDOTA_BASE_URL}/players/${accountId}/heroes`;
+            const params = [];
+            
             if (days) {
-                url += `?date=${days}`;
+                params.push(`date=${days}`);
+            }
+            if (lobbyType) {
+                params.push(`lobby_type=${lobbyType}`);
+            }
+
+            if (params.length > 0) {
+                url += `?${params.join('&')}`;
             }
 
             try {
@@ -199,7 +243,12 @@
 
                 // OpenDota returns an empty array if the profile is private/empty/no games played in period
                 if (!Array.isArray(data) || data.length === 0) {
-                     return { success: false, message: "No hero data found for this period." };
+                     // Customize message for Pro Matches if lobbyType is set
+                     const message = lobbyType === LOBBY_TYPE_PRO 
+                         ? "No Tournament matches found." 
+                         : (days ? "No hero data found for this period." : "No hero data found.");
+                         
+                     return { success: false, message: message };
                 }
 
                 // Get top N heroes
@@ -212,7 +261,7 @@
                 return { success: true, heroes: topHeroes };
 
             } catch (error) {
-                console.error(`Error fetching data for ${accountId} (days: ${days}):`, error);
+                console.error(`Error fetching data for ${accountId} (days: ${days}, lobby: ${lobbyType}):`, error);
                 return { success: false, message: `API Error: ${error.message}.` };
             }
         }
@@ -223,12 +272,17 @@
          * @returns {string} HTML string for the list.
          */
         function generateHeroListHTML(heroes) {
+            // Check if the hero list is empty and provide a message if needed
+            if (!heroes || heroes.length === 0) {
+                return '<div class="text-center text-gray-500 pt-8">No hero data to display.</div>';
+            }
+            
             return heroes.map((hero, index) => `
                 <li class="flex justify-between items-center text-gray-300">
-                    <span class="font-medium text-white">${index + 1}. ${hero.name}</span>
-                    <div class="text-right flex items-center">
-                        <span class="text-xs mr-2 font-mono bg-gray-700 px-2 py-0.5 rounded">${hero.games} games</span>
-                        <span class="text-xs font-mono px-2 py-0.5 rounded ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === 'N/A' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate} WR</span>
+                    <span class="font-medium text-white text-sm truncate">${index + 1}. ${hero.name}</span>
+                    <div class="text-right flex items-center flex-shrink-0 ml-2">
+                        <span class="text-xs mr-1 font-mono bg-gray-700 px-1.5 py-0.5 rounded">${hero.games} games</span>
+                        <span class="text-xs font-mono px-1.5 py-0.5 rounded ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === 'N/A' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate} WR</span>
                     </div>
                 </li>
             `).join('');
@@ -243,27 +297,29 @@
             let cardHTML = '';
             
             // Check overall success based on having at least one valid result
-            const overallSuccess = result.allTime.success || result.monthly.success;
+            const overallSuccess = result.allTime.success || result.monthly.success || result.pro.success;
             
-            // --- All-Time Content ---
-            let allTimeContent;
-            if (result.allTime.success) {
-                allTimeContent = `<ul class="space-y-3 hero-stat-list">${generateHeroListHTML(result.allTime.heroes)}</ul>`;
-            } else {
-                allTimeContent = `<div class="p-4 text-center text-red-300 bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${result.allTime.message}</div>`;
-            }
+            // --- Helper function for column content ---
+            const renderColumn = (data, title) => {
+                let content;
+                let success = data.success && data.heroes.length > 0;
+                
+                if (success) {
+                    content = `<ul class="space-y-2 hero-stat-list">${generateHeroListHTML(data.heroes)}</ul>`;
+                } else {
+                    const messageClass = (title === 'Professional Games') ? 'text-gray-400 text-sm' : 'text-red-300 text-sm';
+                    // Updated column title in case of error message
+                    const displayTitle = title === 'Tournament Games' ? 'Tournament matches' : title; 
+                    content = `<div class="p-4 text-center ${messageClass} bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${data.message.replace('Tournament matches', displayTitle)}</div>`;
+                }
 
-            // --- Monthly Content ---
-            let monthlyContent;
-            if (result.monthly.success) {
-                monthlyContent = `<ul class="space-y-3 hero-stat-list">${generateHeroListHTML(result.monthly.heroes)}</ul>`;
-            } else {
-                // If it's a "No hero data" message, make it look slightly less severe
-                const msg = result.monthly.message.includes("No hero data") ? 
-                            `<div class="p-4 text-center text-gray-400 bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${result.monthly.message} (Likely due to no recent games)</div>` :
-                            `<div class="p-4 text-center text-red-300 bg-gray-800/50 rounded-lg hero-stat-list flex items-center justify-center">${result.monthly.message}</div>`;
-                monthlyContent = msg;
-            }
+                return `
+                    <div>
+                        <h4 class="text-lg font-semibold text-white mb-3 border-b border-gray-600 pb-1">${title}</h4>
+                        ${content}
+                    </div>
+                `;
+            };
 
             // --- Card Assembly ---
             cardHTML = `
@@ -273,18 +329,15 @@
                     </h3>
                     <p class="text-sm text-gray-400 -mt-2">Profile ID: ${result.accountId}</p>
                     
-                    <div class="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
                         <!-- All-Time Column -->
-                        <div>
-                            <h4 class="text-lg font-semibold text-white mb-3 border-b border-gray-600 pb-1">All-Time Heroes</h4>
-                            ${allTimeContent}
-                        </div>
+                        ${renderColumn(result.allTime, 'All-Time Heroes')}
 
                         <!-- Monthly Column -->
-                        <div>
-                            <h4 class="text-lg font-semibold text-white mb-3 border-b border-gray-600 pb-1">Last 30 Days Heroes</h4>
-                            ${monthlyContent}
-                        </div>
+                        ${renderColumn(result.monthly, 'Last Month Heroes')}
+                        
+                        <!-- Pro Games Column -->
+                        ${renderColumn(result.pro, 'Recent Tournament Games')}
                     </div>
                 </div>
             `;
@@ -302,14 +355,17 @@
             clearUI();
             setLoading(true);
 
-            // 2. Get Input IDs
+            // 2. Get Input IDs and Parse URLs
             const inputs = Array.from(document.querySelectorAll('#inputs-container input'));
+            
             const profileIds = inputs
-                .map(input => input.value.trim())
-                .filter(id => id.length > 0);
+                // Use the new parser function
+                .map(input => parseInputForAccountId(input.value))
+                // Filter out null results (invalid format or empty)
+                .filter(id => id !== null && id.length > 0);
 
             if (profileIds.length === 0) {
-                displayMessage('Please enter at least one valid Dota 2 Profile ID.', 'info');
+                displayMessage('Please enter at least one valid Dota 2 Profile ID or Dotabuff URL.', 'info');
                 setLoading(false);
                 return;
             }
@@ -319,10 +375,11 @@
             // 3. Process All IDs concurrently
             try {
                 const fetchPromises = uniqueProfileIds.map(async id => {
-                    // Concurrent fetches for the two periods
-                    const [allTimeResult, monthlyResult, playerResponse] = await Promise.all([
-                        fetchHeroStats(id, null), // All-Time
-                        fetchHeroStats(id, 30),   // Last 30 Days
+                    // Concurrent fetches for the three periods/filters
+                    const [allTimeResult, monthlyResult, proResult, playerResponse] = await Promise.all([
+                        fetchHeroStats(id, null, null),   // All-Time
+                        fetchHeroStats(id, 30, null),     // Last 30 Days
+                        fetchHeroStats(id, 180, LOBBY_TYPE_PRO), // Tournament Games
                         fetch(`${OPENDOTA_BASE_URL}/players/${id}`) // Player name
                     ]);
 
@@ -336,7 +393,8 @@
                         accountId: id,
                         name: playerName,
                         allTime: allTimeResult,
-                        monthly: monthlyResult
+                        monthly: monthlyResult,
+                        pro: proResult
                     };
                 });
 
@@ -369,7 +427,7 @@
             const inputsContainer = document.getElementById('inputs-container');
             
             // Define position labels for better context (Pos 1 through 5)
-            const positions = ["Hard Carry (Pos 1)", "Mid Lane (Pos 2)", "Offlaner (Pos 3)", "Soft Support (Pos 4)", "Hard Support (Pos 5)"];
+            const positions = POSITIONS; // Using the global POSITIONS array
 
             // Generate 5 inputs dynamically
             for (let i = 0; i < MAX_PROFILES; i++) {
@@ -377,9 +435,8 @@
                 const inputHTML = `
                     <input type="text" id="profile-id-${i + 1}"
                            class="w-full bg-gray-900 text-white border border-gray-600 rounded-lg py-2.5 px-4 focus:ring-red-500 focus:border-red-500 placeholder-gray-500 transition duration-150"
-                           placeholder="${positionLabel} - Profile ID (e.g., 12345678)"
-                           pattern="[0-9]*"
-                           inputmode="numeric">
+                           placeholder="${positionLabel} Profile ID or Dotabuff URL"
+                           >
                 `;
                 inputsContainer.insertAdjacentHTML('beforeend', inputHTML);
             }
