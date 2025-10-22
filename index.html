@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dota 2 Most Played Hero Checker</title>
+    <title>Dota 2 Hero Profile Checker</title>
     <!-- Load Tailwind CSS -->
     <script src="https://cdn.tailwindcss.com"></script>
     <link href="https://fonts.googleapis.com/css2?family=Inter:wght(0,400);0,600;0,700&display=swap" rel="stylesheet">
@@ -33,18 +33,17 @@
         .dota-button:active {
             transform: scale(0.98);
         }
-        /* The custom styles for .hero-stat-list were removed to allow the list to fit all 10 results without scrolling. */
     </style>
 </head>
 <body class="p-4 md:p-8 min-h-screen">
 
-    <div class="max-w-6xl mx-auto"> <!-- Increased max width for 3 columns -->
+    <div class="max-w-6xl mx-auto">
         <header class="text-center mb-10">
             <h1 class="text-4xl font-extrabold text-white mb-2 tracking-tight">
-                Dota 2 Hero Stats Checker
+                Dota 2 Hero Profile Checker
             </h1>
             <p class="text-lg text-gray-400">
-                Enter up to 5 Dotabuff Profile links or IDs to see hero stats. You can also pass IDs in the URL (e.g., `?id1=ID&id2=ID`).
+                Analyze up to five player hero pools based on Account ID or Dotabuff URL.
             </p>
         </header>
 
@@ -71,7 +70,7 @@
         <div id="results-container" class="space-y-6">
             <h2 id="results-title" class="text-2xl font-bold text-white hidden">Results</h2>
             
-            <!-- New Copy Button -->
+            <!-- Copy Button -->
             <button id="copy-button" class="dota-button w-full text-white font-semibold py-2 px-4 rounded-lg shadow-lg hidden">
                 Copy All Results to Clipboard
             </button>
@@ -88,22 +87,21 @@
     <script type="text/javascript">
         // Global map to store Hero ID to Hero Name and Icon URL mapping
         let heroMap = {};
-        // New global variable to store the data displayed in the cards for copying
+        // Global variable to store the data displayed in the cards for copying
         let processedResults = []; 
 
         const MAX_PROFILES = 5;
         const TOP_HEROES_COUNT = 10;
         const OPENDOTA_BASE_URL = 'https://api.opendota.com/api';
         
-        // Asset URLs - Updated per user request
+        // Asset URLs
         const HERO_ASSET_BASE_URL = 'https://cdn.steamstatic.com/apps/dota2/images/dota_react/heroes/';
-        // Base path for OpenDota rank assets
         const RANK_ASSET_BASE_URL = 'https://www.opendota.com/assets/images/dota2/rank_icons/';
 
         // Lobby Type 1 corresponds to tournament games
         const LOBBY_TYPE_PRO = 1; 
         const POSITIONS = ["Carry", "Mid", "Offlane", "Soft Supp", "Hard Supp"];
-
+        
         // --- Utility Functions ---
 
         /**
@@ -112,7 +110,7 @@
         function clearUI() {
             document.getElementById('results-title').classList.add('hidden');
             document.getElementById('results-list').innerHTML = '';
-            document.getElementById('copy-button').classList.add('hidden'); // Hide copy button
+            document.getElementById('copy-button').classList.add('hidden');
             document.getElementById('message-box').classList.add('hidden');
             document.getElementById('message-box').textContent = '';
             document.getElementById('message-box').className = 'mt-6 p-4 rounded-lg text-center hidden';
@@ -156,9 +154,9 @@
                 spinner.classList.add('hidden');
             }
         }
-        
+
         /**
-         * Parses an input string (either raw ID or Dotabuff URL) and returns the clean numerical ID.
+         * Parses an input string (either raw ID or Dotabuff URL) and returns the clean numerical Account ID.
          * @param {string} input - The raw input from a text field.
          * @returns {string|null} The extracted numerical account ID, or null if invalid.
          */
@@ -167,22 +165,18 @@
             if (!trimmedInput) return null;
 
             // 1. Regex for Dotabuff URL: https://www.dotabuff.com/players/12345678
-            // Allows optional 'www.' and is non-greedy
             const dotabuffRegex = /dotabuff\.com\/players\/(\d+)/i;
             const match = trimmedInput.match(dotabuffRegex);
 
             if (match && match[1]) {
-                // Return the captured group (the ID)
                 return match[1];
             } 
             
-            // 2. Check if it's just a number (which is what OpenDota expects)
-            // Checks for 1 or more digits
+            // 2. Check if it's just a number 
             if (/^\d+$/.test(trimmedInput)) {
                 return trimmedInput;
             }
 
-            // Invalid format
             return null; 
         }
 
@@ -196,7 +190,6 @@
             for (let i = 1; i <= MAX_PROFILES; i++) {
                 const id = params.get(`id${i}`);
                 if (id) {
-                    // Use the existing parser to validate and clean the ID
                     const cleanId = parseInputForAccountId(id);
                     if (cleanId) {
                         urlIds.push(cleanId);
@@ -226,7 +219,6 @@
                     summary += `[ ${section.title} ]\n`;
 
                     if (section.data.success && section.data.heroes.length > 0) {
-                        // Use a fixed width for hero names for alignment
                         section.data.heroes.forEach((hero, index) => {
                             summary += `${String(index + 1).padStart(2)}. ${hero.name.padEnd(25)} ${String(hero.games).padEnd(5)} games | ${hero.winrate} WR\n`;
                         });
@@ -257,7 +249,6 @@
             const button = document.getElementById('copy-button');
 
             try {
-                // Select and copy using the traditional method for maximum compatibility in iframes
                 tempElement.select();
                 document.execCommand('copy');
                 success = true;
@@ -270,10 +261,7 @@
             if (success) {
                 const originalText = button.textContent;
                 button.textContent = 'Copied to Clipboard! ✅';
-                // Reset button text after a short delay
-                setTimeout(() => {
-                    button.textContent = originalText;
-                }, 2000);
+                setTimeout(() => { button.textContent = originalText; }, 2000);
             } else {
                 displayMessage('Failed to copy text. Console log has the text for manual copy.', 'error');
                 console.log("Text summary that failed to copy:\n", textToCopy);
@@ -281,10 +269,7 @@
         }
 
         /**
-         * Generates the URL for the rank medal icon based on the rank_tier value, using the simplified rank_icon_X.png format.
-         * The rank text remains detailed (e.g., Archon 4).
-         * @param {number} rankTier - The two-digit rank tier (e.g., 55 for Legend 5).
-         * @returns {object} An object containing the URL and the descriptive rank text.
+         * Generates the URL for the rank medal icon and its text representation.
          */
         function getRankIconUrl(rankTier) {
             
@@ -300,42 +285,76 @@
                 8: 'Immortal' 
             };
 
-            // Extract tier (first digit) and star (second digit)
             const tier = Math.floor(rankTier / 10); 
             const star = rankTier % 10; 
-
-            // Base uncalibrated/private files
             const UNCALIBRATED_ICON_URL = `${RANK_ASSET_BASE_URL}rank_icon_0.png`; 
             const UNCALIBRATED_TEXT = tierMap[0];
             
             let filename;
             let rankText = tierMap[tier] || 'Ranked';
             
-            // Check if rank is invalid, missing, or uncalibrated (0-9)
             if (!rankTier || typeof rankTier !== 'number' || tier < 1) {
                 return { url: UNCALIBRATED_ICON_URL, text: UNCALIBRATED_TEXT };
             }
 
-            // Use the simplified filename format requested: rank_icon_X.png
             if (tier >= 1 && tier <= 8) {
                 filename = `rank_icon_${tier}.png`;
                 
-                // Keep rank text accurate by including star if applicable (1-7)
                 if (tier >= 1 && tier <= 7 && star >= 1 && star <= 5) {
                     rankText += ` ${star}`;
                 }
             } else {
-                 // Fallback if tier is outside the expected range
                  return { url: UNCALIBRATED_ICON_URL, text: UNCALIBRATED_TEXT };
             }
             
-            // Construct the final URL using the requested OpenDota base path
             const finalUrl = `${RANK_ASSET_BASE_URL}${filename}`;
             
             return { url: finalUrl, text: rankText };
         }
 
-        // --- Core Application Logic ---
+        /**
+         * Calculates a color on a gradient scale from Red (0%) -> Yellow (50%) -> Green (100%).
+         * We use a slightly darker color to maintain good contrast with the text.
+         * @param {string} wrText - The winrate string (e.g., "55%").
+         * @returns {string} An RGB color string (e.g., "rgb(204, 255, 0)").
+         */
+        function getWinrateColor(wrText) {
+            let winrate;
+            try {
+                winrate = parseFloat(wrText.replace('%', ''));
+            } catch {
+                return 'rgb(55, 65, 81)'; // Default gray for invalid/no data (matches bg-gray-700)
+            }
+            
+            // Clamp the winrate between 0 and 100
+            winrate = Math.min(100, Math.max(0, winrate));
+
+            let r = 0, g = 0, b = 0;
+
+            if (winrate <= 50) {
+                // Red (0%) to Yellow (50%)
+                // Green component scales from 0 to 255
+                const scale = winrate / 50;
+                r = 255;
+                g = Math.round(255 * scale);
+            } else {
+                // Yellow (50%) to Green (100%)
+                // Red component scales from 255 to 0
+                const scale = (winrate - 50) / 50;
+                r = Math.round(255 * (1 - scale));
+                g = 255;
+            }
+            
+            // Factor to darken the color for better contrast on the dark background
+            const INTENSITY_FACTOR = 0.8; 
+            
+            r = Math.round(r * INTENSITY_FACTOR);
+            g = Math.round(g * INTENSITY_FACTOR);
+            // b remains 0
+
+            return `rgb(${r}, ${g}, ${b})`;
+        }
+
 
         /**
          * Fetches the hero list from OpenDota and creates a map (ID -> {Name, IconUrl}).
@@ -350,16 +369,11 @@
                 const data = await response.json();
 
                 data.forEach(hero => {
-                    // Hero icon placeholder size (32x32)
                     let iconUrl = 'https://placehold.co/32x32/374151/FFFFFF?text=?'; 
                     
                     if (hero.name) {
-                        // hero.name is like 'npc_dota_hero_axe', we extract 'axe'
                         const safeName = hero.name.replace('npc_dota_hero_', ''); 
-                        // Using the Steam CDN path for hero icons
                         iconUrl = `${HERO_ASSET_BASE_URL}${safeName}.png`;
-                    } else {
-                        console.warn(`Missing name for Hero ID: ${hero.id} (${hero.localized_name})`);
                     }
                     
                     heroMap[hero.id] = {
@@ -369,13 +383,13 @@
                 });
                 displayMessage('Hero database loaded successfully. Enter profile IDs or Dotabuff URLs to begin.', 'success');
                 document.getElementById('button-text').textContent = 'Get Most Played Heroes';
-                return true; // Success
+                return true; 
             } catch (error) {
                 console.error("Failed to fetch hero map:", error);
                 displayMessage('Failed to load hero database. API might be down.', 'error');
                 document.getElementById('submit-button').disabled = true;
                 document.getElementById('button-text').textContent = 'Error Loading Hero Data';
-                return false; // Failure
+                return false; 
             } finally {
                 setLoading(false);
                 if (Object.keys(heroMap).length > 0) {
@@ -383,66 +397,39 @@
                 }
             }
         }
-
-        /**
-         * Fetches the top heroes for a given profile ID for a specified time frame or lobby type.
-         * @param {string} accountId - The Dota 2 profile ID.
-         * @param {number|null} days - Number of days to filter (e.g., 30), or null for all-time.
-         * @param {number|null} lobbyType - Lobby type ID (e.g., 2 for Ranked), or null for all types.
-         * @returns {Promise<Object>} Object containing success status, message, and hero data.
-         */
+        
         async function fetchHeroStats(accountId, days, lobbyType) {
             let url = `${OPENDOTA_BASE_URL}/players/${accountId}/heroes`;
             const params = [];
             
-            if (days) {
-                params.push(`date=${days}`);
-            }
-            if (lobbyType) {
-                params.push(`lobby_type=${lobbyType}`);
-            }
+            if (days) params.push(`date=${days}`);
+            if (lobbyType) params.push(`lobby_type=${lobbyType}`);
 
-            if (params.length > 0) {
-                url += `?${params.join('&')}`;
-            }
+            if (params.length > 0) url += `?${params.join('&')}`;
 
             try {
                 const response = await fetch(url);
-                
-                if (response.status === 404) {
-                    return { success: false, message: "Profile not found or invalid ID." };
-                }
-
-                if (!response.ok) {
-                    throw new Error(`API returned status ${response.status}`);
-                }
-
+                if (response.status === 404) return { success: false, message: "Profile not found or invalid ID." };
+                if (!response.ok) throw new Error(`API returned status ${response.status}`);
                 const data = await response.json();
 
-                // 1. Filter out heroes with 0 games played immediately, as requested.
                 const playedHeroes = data.filter(heroStat => parseInt(heroStat.games, 10) > 0);
 
-                // 2. Check if there is any data after filtering.
                 if (!Array.isArray(playedHeroes) || playedHeroes.length === 0) {
-                     // Customize message for Pro Matches if lobbyType is set
                      const message = lobbyType === LOBBY_TYPE_PRO 
-                         ? "No Tournament matches found." 
+                         ? "No Tournament matches found (last 180 days)." 
                          : (days ? "No hero data found for this period." : "No hero data found.");
-                         
                      return { success: false, message: message };
                 }
 
-                // 3. Get top N heroes from the filtered list. Slice correctly handles arrays shorter than TOP_HEROES_COUNT.
                 const topHeroes = playedHeroes.slice(0, TOP_HEROES_COUNT).map(heroStat => {
                     const heroInfo = heroMap[heroStat.hero_id];
-                    // Hero icon placeholder size (32x32)
                     const defaultIcon = 'https://placehold.co/32x32/374151/FFFFFF?text=?'; 
 
                     return {
                         name: heroInfo ? heroInfo.name : `Unknown Hero (ID: ${heroStat.hero_id})`,
                         iconUrl: heroInfo ? heroInfo.iconUrl : defaultIcon,
                         games: parseInt(heroStat.games, 10),
-                        // FIX: Changed to toFixed(0) for integer rounding and updated 0 win case to '0%'
                         winrate: (parseInt(heroStat.win, 10) > 0) 
                             ? (parseInt(heroStat.win, 10) / parseInt(heroStat.games, 10) * 100).toFixed(0) + '%' 
                             : '0%',
@@ -452,62 +439,51 @@
                 return { success: true, heroes: topHeroes };
 
             } catch (error) {
-                console.error(`Error fetching data for ${accountId} (days: ${days}, lobby: ${lobbyType}):`, error);
+                console.error(`Error fetching hero stats for ${accountId}:`, error);
                 return { success: false, message: `API Error: ${error.message}.` };
             }
         }
 
-        /**
-         * Generates the HTML list structure for a set of heroes.
-         * @param {Array<Object>} heroes - Array of hero statistics.
-         * @returns {string} HTML string for the list.
-         */
         function generateHeroListHTML(heroes) {
-            // Check if the hero list is empty and provide a message if needed
             if (!heroes || heroes.length === 0) {
                 return '<div class="text-center text-gray-500 pt-8">No hero data to display.</div>';
             }
             
-            return heroes.map((hero, index) => `
-                <li class="flex justify-between items-center text-gray-300 py-1">
-                    <div class="flex items-center">
-                        <span class="font-medium text-white text-sm mr-2">${index + 1}.</span>
-                        <!-- Icon size is w-8 h-8 (32x32) -->
-                        <img src="${hero.iconUrl}" alt="${hero.name} Icon" class="w-8 h-8 rounded-full mr-2 object-cover border border-gray-600" onerror="this.onerror=null;this.src='https://placehold.co/32x32/374151/FFFFFF?text=?'">
-                        <span class="font-medium text-white text-sm truncate">${hero.name}</span>
-                    </div>
-                    <div class="text-right flex items-center flex-shrink-0 ml-2">
-                        <span class="text-xs mr-1 font-mono bg-gray-700 px-1.5 py-0.5 rounded">${hero.games} games</span>
-                        <!-- Added w-14, text-center, and flex-shrink-0 to fix the size of the WR element -->
-                        <span class="text-xs font-mono px-1.5 py-0.5 rounded w-14 text-center flex-shrink-0 ${parseFloat(hero.winrate) >= 50 ? 'bg-green-700 text-green-200' : (hero.winrate === '0%' ? 'bg-gray-500 text-white' : 'bg-red-700 text-red-200')}">${hero.winrate}</span>
-                    </div>
-                </li>
-            `).join('');
+            return heroes.map((hero, index) => {
+                const wrColor = getWinrateColor(hero.winrate);
+                // The winrate text is now always set to Tailwind's 'text-black' for maximum contrast
+                const textColor = 'text-black'; 
+
+                return `
+                    <li class="flex justify-between items-center text-gray-300 py-1">
+                        <div class="flex items-center">
+                            <span class="font-medium text-white text-sm mr-2">${index + 1}.</span>
+                            <img src="${hero.iconUrl}" alt="${hero.name} Icon" class="w-8 h-8 rounded-full mr-2 object-cover border border-gray-600" onerror="this.onerror=null;this.src='https://placehold.co/32x32/374151/FFFFFF?text=?'">
+                            <span class="font-medium text-white text-sm truncate">${hero.name}</span>
+                        </div>
+                        <div class="text-right flex items-center flex-shrink-0 ml-2">
+                            <span class="text-xs mr-1 font-mono bg-gray-700 px-1.5 py-0.5 rounded">${hero.games} games</span>
+                            <span class="text-xs font-mono px-1.5 py-0.5 rounded w-14 text-center flex-shrink-0 ${textColor}" style="background-color: ${wrColor};">${hero.winrate}</span>
+                        </div>
+                    </li>
+                `;
+            }).join('');
         }
 
-        /**
-         * Renders the results card for a single player.
-         * @param {Object} result - The combined result object.
-         */
         function renderPlayerCard(result) {
             const resultsList = document.getElementById('results-list');
-            let cardHTML = '';
             
-            // Check overall success based on having at least one valid result
             const overallSuccess = result.allTime.success || result.monthly.success || result.pro.success;
             
-            // --- Helper function for column content ---
             const renderColumn = (data, title) => {
                 let content;
                 let success = data.success && data.heroes.length > 0;
                 
                 if (success) {
-                    // Removed .hero-stat-list class to allow the list to expand fully
                     content = `<ul class="space-y-2">${generateHeroListHTML(data.heroes)}</ul>`;
                 } else {
-                    const messageClass = (title === 'Professional Games') ? 'text-gray-400 text-sm' : 'text-red-300 text-sm';
+                    const messageClass = (title.includes('Tournament')) ? 'text-gray-400 text-sm' : 'text-red-300 text-sm';
                     const displayTitle = title === 'Tournament Games' ? 'Tournament matches' : title; 
-                    // Added h-full and min-h-[200px] to ensure visual stability when there is no data
                     content = `<div class="p-4 text-center ${messageClass} bg-gray-800/50 rounded-lg flex items-center justify-center h-full min-h-[200px]">${data.message.replace('Tournament matches', displayTitle)}</div>`;
                 }
 
@@ -519,16 +495,13 @@
                 `;
             };
 
-            // --- Card Assembly ---
-            // Fallback placeholder image for rank icon failure. Updated to 48x48.
             const rankFallbackPlaceholder = 'https://placehold.co/48x48/374151/FFFFFF?text=R';
 
-            cardHTML = `
+            const cardHTML = `
                 <div class="dota-card ${overallSuccess ? 'bg-gray-700' : 'bg-gray-700/50 border border-red-500/50'} p-6 rounded-xl space-y-4">
                     <h3 class="flex items-center text-2xl font-bold text-red-400 truncate">
                         <img src="${result.avatarUrl}" alt="${result.name} Profile Picture" class="w-10 h-10 rounded-full mr-3 object-cover border-2 border-red-500" onerror="this.onerror=null;this.src='https://placehold.co/40x40/374151/FFFFFF?text=P'">
                         <span>${result.name}</span>
-                        <!-- Rank icon size is w-12 h-12 (48x48) -->
                         <img src="${result.rankUrl.url}" alt="${result.rankUrl.text}" title="${result.rankText}" class="w-12 h-12 ml-3 flex-shrink-0" onerror="this.onerror=null;this.src='${rankFallbackPlaceholder}'">
                     </h3>
                     <p class="text-sm text-gray-400 -mt-2">
@@ -537,13 +510,8 @@
                     </p>
                     
                     <div class="grid grid-cols-1 md:grid-cols-3 gap-6">
-                        <!-- All-Time Column -->
                         ${renderColumn(result.allTime, 'All-Time Heroes')}
-
-                        <!-- Monthly Column -->
                         ${renderColumn(result.monthly, 'Last Month Heroes')}
-                        
-                        <!-- Pro Games Column -->
                         ${renderColumn(result.pro, 'Recent Tournament Games')}
                     </div>
                 </div>
@@ -551,15 +519,10 @@
 
             resultsList.insertAdjacentHTML('beforeend', cardHTML);
         }
-        
-        /**
-         * Core logic to fetch data for multiple profile IDs and render the results.
-         * @param {string[]} profileIds - Array of clean profile IDs to fetch.
-         */
+
         async function fetchAndRenderProfiles(profileIds) {
             const uniqueProfileIds = [...new Set(profileIds)];
             
-            // Clear UI and set loading state if called directly (like from URL auto-submit)
             if (uniqueProfileIds.length > 0) {
                  clearUI();
                  setLoading(true);
@@ -567,54 +530,77 @@
 
             try {
                 const fetchPromises = uniqueProfileIds.map(async id => {
-                    // Concurrent fetches for the three periods/filters
-                    const [allTimeResult, monthlyResult, proResult, playerResponse] = await Promise.all([
-                        fetchHeroStats(id, null, null),   // All-Time
-                        fetchHeroStats(id, 30, null),     // Last 30 Days
-                        fetchHeroStats(id, 180, LOBBY_TYPE_PRO), // Tournament Games (180 days)
-                        fetch(`${OPENDOTA_BASE_URL}/players/${id}`) // Player name/profile data
-                    ]);
-
-                    let playerName = `Player ${id}`;
-                    let avatarUrl = 'https://placehold.co/40x40/374151/FFFFFF?text=P'; // Default placeholder
-                    let rankUrl = getRankIconUrl(0); // Default to uncalibrated
-                    let rankText = 'Uncalibrated';
+                    // Exponential backoff retry loop for each profile fetch
+                    const maxRetries = 3;
+                    let lastError = null;
                     
-                    if (playerResponse.ok) {
-                        const playerData = await playerResponse.json();
-                        playerName = playerData.profile?.personaname || `Player ${id}`;
-                        avatarUrl = playerData.profile?.avatarfull || avatarUrl;
-                        
-                        const rankTier = playerData.rank_tier;
-                        const leaderboardRank = playerData.leaderboard_rank;
+                    for (let attempt = 0; attempt < maxRetries; attempt++) {
+                        try {
+                            const [allTimeResult, monthlyResult, proResult, playerResponse] = await Promise.all([
+                                fetchHeroStats(id, null, null),   
+                                fetchHeroStats(id, 30, null),     
+                                fetchHeroStats(id, 180, LOBBY_TYPE_PRO), 
+                                fetch(`${OPENDOTA_BASE_URL}/players/${id}`) 
+                            ]);
 
-                        if (rankTier) {
-                            const rankData = getRankIconUrl(rankTier);
-                            rankUrl = rankData;
-                            rankText = rankData.text;
+                            let playerName = `Player ${id}`;
+                            let avatarUrl = 'https://placehold.co/40x40/374151/FFFFFF?text=P'; 
+                            let rankUrl = getRankIconUrl(0); 
+                            let rankText = 'Uncalibrated';
+                            
+                            if (playerResponse.ok) {
+                                const playerData = await playerResponse.json();
+                                playerName = playerData.profile?.personaname || `Player ${id}`;
+                                avatarUrl = playerData.profile?.avatarfull || avatarUrl;
+                                
+                                const rankTier = playerData.rank_tier;
+                                const leaderboardRank = playerData.leaderboard_rank;
 
-                            if (rankTier >= 80 && leaderboardRank) {
-                                rankText = `Immortal #${leaderboardRank}`;
+                                if (rankTier) {
+                                    const rankData = getRankIconUrl(rankTier);
+                                    rankUrl = rankData;
+                                    rankText = rankData.text;
+
+                                    if (rankTier >= 80 && leaderboardRank) {
+                                        rankText = `Immortal #${leaderboardRank}`;
+                                    }
+                                }
+                            }
+
+                            return {
+                                accountId: id,
+                                name: playerName,
+                                avatarUrl: avatarUrl,
+                                rankUrl: rankUrl,
+                                rankText: rankText,
+                                allTime: allTimeResult,
+                                monthly: monthlyResult,
+                                pro: proResult
+                            };
+                        } catch (error) {
+                            lastError = error;
+                            if (attempt < maxRetries - 1) {
+                                const delay = Math.pow(2, attempt) * 1000; // 1s, 2s, 4s
+                                await new Promise(resolve => setTimeout(resolve, delay));
                             }
                         }
                     }
-
+                    console.error(`Failed to process profile ${id} after ${maxRetries} attempts.`, lastError);
                     return {
                         accountId: id,
-                        name: playerName,
-                        avatarUrl: avatarUrl,
-                        rankUrl: rankUrl,
-                        rankText: rankText,
-                        allTime: allTimeResult,
-                        monthly: monthlyResult,
-                        pro: proResult
+                        name: `Player ${id} (Error)`,
+                        avatarUrl: 'https://placehold.co/40x40/374151/FFFFFF?text=X',
+                        rankUrl: getRankIconUrl(0),
+                        rankText: 'Error',
+                        allTime: { success: false, message: 'Failed to fetch data after retries.' },
+                        monthly: { success: false, message: 'Failed to fetch data after retries.' },
+                        pro: { success: false, message: 'Failed to fetch data after retries.' }
                     };
                 });
 
                 const results = await Promise.all(fetchPromises);
-                processedResults = results; // Store results globally for copying
+                processedResults = results; 
 
-                // 2. Render Results
                 document.getElementById('results-title').classList.remove('hidden');
 
                 results.forEach(result => {
@@ -635,18 +621,11 @@
             }
         }
 
-
-        /**
-         * Handles the main form submission.
-         */
         async function handleSubmit(event) {
             event.preventDefault();
-
-            // 1. Setup UI
             clearUI();
             setLoading(true);
 
-            // 2. Get Input IDs and Parse URLs
             const inputs = Array.from(document.querySelectorAll('#inputs-container input'));
             
             const profileIds = inputs
@@ -662,24 +641,22 @@
             await fetchAndRenderProfiles(profileIds);
         }
 
-        /**
-         * Initializes the application: loads inputs, hero map, and checks URL for auto-submit.
-         */
+        // --- Global Init ---
+
         function initializeApp() {
-            const form = document.getElementById('profile-form');
-            form.addEventListener('submit', handleSubmit);
+            // 1. Setup Hero Tab Form
+            const heroForm = document.getElementById('profile-form');
+            heroForm.addEventListener('submit', handleSubmit);
             
+            // Setup Copy Button
             const copyButton = document.getElementById('copy-button');
             copyButton.addEventListener('click', copyToClipboard);
-
-            const inputsContainer = document.getElementById('inputs-container');
             
-            // Define position labels for better context (Pos 1 through 5)
-            const positions = POSITIONS; // Using the global POSITIONS array
-
-            // Generate 5 inputs dynamically
+            // 2. Generate Input Fields
+            const inputsContainer = document.getElementById('inputs-container');
+            const positions = POSITIONS; 
             for (let i = 0; i < MAX_PROFILES; i++) {
-                const positionLabel = positions[i]; // Use the defined label
+                const positionLabel = positions[i];
                 const inputHTML = `
                     <input type="text" id="profile-id-${i + 1}"
                            class="w-full bg-gray-900 text-white border border-gray-600 rounded-lg py-2.5 px-4 focus:ring-red-500 focus:border-red-500 placeholder-gray-500 transition duration-150"
@@ -688,29 +665,22 @@
                 `;
                 inputsContainer.insertAdjacentHTML('beforeend', inputHTML);
             }
-
-            // Start loading the essential hero data
+            
+            // 3. Initial Load
             fetchHeroMap().then(isSuccess => {
                 if (isSuccess) {
                     const urlIds = getProfileIdsFromUrl();
                     if (urlIds.length > 0) {
                         const inputs = document.querySelectorAll('#inputs-container input');
-
-                        // Pre-fill inputs with IDs from the URL
                         urlIds.forEach((id, index) => {
-                            if (inputs[index]) {
-                                inputs[index].value = id;
-                            }
+                            if (inputs[index]) inputs[index].value = id;
                         });
-                        
-                        // Automatically submit the job with the IDs from the URL
                         fetchAndRenderProfiles(urlIds);
                     }
                 }
             });
         }
 
-        // Run the initialization function when the window loads
         window.onload = initializeApp;
 
     </script>
